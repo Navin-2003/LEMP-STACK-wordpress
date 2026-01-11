@@ -1,0 +1,310 @@
+# WordPress Installation on AlmaLinux using LAMP Stack
+
+This document provides **complete, step-by-step documentation** to install **WordPress using the LAMP stack** (**Linux + Apache + MariaDB + PHP**) on **AlmaLinux 8/9**.
+
+This version is **machine-test friendly**, **beginner-safe**, and commonly accepted in interviews.
+
+---
+
+## Architecture Overview
+
+* **Linux**: AlmaLinux OS
+* **Apache**: Web server
+* **MariaDB**: Database server
+* **PHP**: Application runtime
+
+---
+
+## STEP 1: Update the System
+
+```bash
+sudo dnf update -y
+sudo reboot
+```
+
+---
+
+## STEP 2: Install Essential Tools
+
+```bash
+sudo dnf install -y nano curl wget tar
+```
+
+---
+
+## STEP 3: SELinux Configuration (Secure & Correct) *(OPTIONAL / SKIPPABLE)*
+
+> ⚠️ **Optional for machine tests** | ✅ **Recommended for production**
+
+SELinux should **remain enabled** in secure environments. For fast machine tests, this step can be skipped **only if SELinux is disabled globally**.
+
+Check status:
+
+```bash
+getenforce
+```
+
+Expected output:
+
+```
+Enforcing
+```
+
+Allow Apache to connect to MariaDB:
+
+```bash
+sudo setsebool -P httpd_can_network_connect_db 1
+```
+
+Verify:
+
+```bash
+getsebool httpd_can_network_connect_db
+```
+
+Expected:
+
+```
+httpd_can_network_connect_db --> on
+```
+
+---
+
+## STEP 4: Install & Start Apache (Web Server)
+
+```bash
+sudo dnf install -y httpd
+sudo systemctl enable --now httpd
+sudo systemctl status httpd
+```
+
+Test in browser:
+
+```
+http://SERVER_IP
+```
+
+You should see the Apache test page.
+
+---
+
+## STEP 5: Configure Firewall for HTTP *(OPTIONAL / SKIPPABLE)*
+
+> ⚠️ **Optional on cloud VMs with security groups** | ✅ **Required on on-prem servers**
+
+```bash
+sudo systemctl enable --now firewalld
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all
+```
+
+bash
+sudo systemctl enable --now firewalld
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all
+
+````
+
+---
+
+## STEP 6: Install & Start MariaDB (Database)
+
+```bash
+sudo dnf install -y mariadb-server
+sudo systemctl enable --now mariadb
+sudo systemctl status mariadb
+````
+
+---
+
+## STEP 7: Secure MariaDB *(RECOMMENDED / OPTIONAL FOR PRACTICE)*
+
+```bash
+sudo mysql_secure_installation
+```
+
+Recommended answers:
+
+* Set root password → Yes
+* Remove anonymous users → Yes
+* Disallow root login remotely → Yes
+* Remove test database → Yes
+* Reload privilege tables → Yes
+
+---
+
+## STEP 8: Create WordPress Database & User
+
+```bash
+mysql -u root -p
+```
+
+```sql
+CREATE DATABASE wordpress;
+CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPass@123';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+Test:
+
+```bash
+mysql -u wpuser -p wordpress
+```
+
+---
+
+## STEP 9: Install PHP & Required Extensions
+
+```bash
+sudo dnf install -y php php-mysqlnd php-gd php-xml php-mbstring php-curl php-json php-zip
+```
+
+Restart Apache:
+
+```bash
+sudo systemctl restart httpd
+```
+
+Verify PHP:
+
+```bash
+php -v
+```
+
+---
+
+## STEP 10: Test PHP with Apache
+
+```bash
+echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/info.php
+```
+
+Open in browser:
+
+```
+http://SERVER_IP/info.php
+```
+
+Remove test file after verification:
+
+```bash
+sudo rm -f /var/www/html/info.php
+```
+
+---
+
+## STEP 11: Download WordPress
+
+```bash
+cd /var/www/html
+sudo wget https://wordpress.org/latest.tar.gz
+sudo tar -xzf latest.tar.gz
+sudo rm -f latest.tar.gz
+```
+
+---
+
+## STEP 12: Set Permissions
+
+```bash
+sudo chown -R apache:apache /var/www/html/wordpress
+sudo find /var/www/html/wordpress -type d -exec chmod 755 {} \;
+sudo find /var/www/html/wordpress -type f -exec chmod 644 {} \;
+```
+
+---
+
+## STEP 13: Configure WordPress
+
+```bash
+cd /var/www/html/wordpress
+sudo cp wp-config-sample.php wp-config.php
+sudo nano wp-config.php
+```
+
+Update database settings:
+
+```php
+define('DB_NAME', 'wordpress');
+define('DB_USER', 'wpuser');
+define('DB_PASSWORD', 'StrongPass@123');
+define('DB_HOST', 'localhost');
+```
+
+---
+
+## STEP 14: Apache Hardening & Restart Services *(OPTIONAL / SKIPPABLE)*
+
+Disable directory listing (security best practice):
+
+```bash
+sudo sed -i 's/Options Indexes FollowSymLinks/Options FollowSymLinks/' /etc/httpd/conf/httpd.conf
+```
+
+Hide Apache version info:
+
+```bash
+echo -e '
+ServerTokens Prod
+ServerSignature Off' | sudo tee -a /etc/httpd/conf/httpd.conf
+```
+
+Restart services:
+
+```bash
+sudo systemctl restart httpd
+sudo systemctl restart mariadb
+```
+
+bash
+sudo systemctl restart httpd
+sudo systemctl restart mariadb
+
+```
+
+---
+
+## STEP 15: Final Test
+
+Open browser:
+```
+
+http://SERVER_IP/wordpress
+
+```
+
+You should see the **WordPress installation page**.
+
+---
+
+## Machine-Test Checklist
+
+1. Apache running
+2. PHP executes with Apache
+3. MariaDB running
+4. Database & user exist
+5. Correct WordPress permissions
+6. wp-config.php configured
+
+---
+
+## Notes
+
+- Apache user = `apache`
+- SELinux is **enabled** (secure configuration)
+- Database access is allowed via SELinux boolean
+- No PHP-FPM required (mod_php)
+- This setup follows **production-safe best practices**
+
+
+---
+
+## Result
+
+If the WordPress installer loads, the **LAMP stack is successfully configured**.
+
+```
