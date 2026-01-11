@@ -1,0 +1,286 @@
+# WordPress Installation on AlmaLinux using LEMP (Friend Version)
+
+This document follows a **simplified, exam-oriented approach** to install **WordPress on AlmaLinux using the LEMP stack**.
+
+⚠️ Note: This version **disables SELinux** and modifies the **main nginx.conf**. This is acceptable for **practice and machine tests**, but **not recommended for production**.
+
+---
+
+## STEP 3: Update the System
+
+```bash
+dnf update -y
+reboot
+```
+
+---
+
+## STEP 4: Install Essential Tools
+
+```bash
+dnf install -y nano curl tar
+```
+
+---
+
+## STEP 5: Disable SELinux
+
+Check current status:
+
+```bash
+getenforce
+```
+
+Temporarily disable:
+
+```bash
+setenforce 0
+```
+
+Permanently disable:
+
+```bash
+sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+```
+
+Verify:
+
+```bash
+getenforce
+```
+
+Expected output:
+
+```
+Permissive
+```
+
+---
+
+## STEP 6: Install & Start NGINX (Web Server)
+
+```bash
+dnf install -y nginx
+systemctl enable --now nginx
+systemctl status nginx
+```
+
+---
+
+## STEP 7: Open Firewall for HTTP
+
+```bash
+systemctl enable --now firewalld
+firewall-cmd --permanent --add-service=http
+firewall-cmd --reload
+firewall-cmd --list-all
+```
+
+Test in browser:
+
+```
+http://SERVER_IP
+```
+
+---
+
+## STEP 8: Install & Start MariaDB
+
+```bash
+dnf install -y mariadb-server
+systemctl enable --now mariadb
+systemctl status mariadb
+```
+
+---
+
+## STEP 9: Secure MariaDB
+
+```bash
+mysql_secure_installation
+```
+
+Recommended answers:
+
+* Set root password → Y
+* Remove anonymous users → Y
+* Disallow root login remotely → Y
+* Remove test database → Y
+* Reload privilege tables → Y
+
+---
+
+## STEP 10: Create WordPress Database & User
+
+```bash
+mysql -u root -p
+```
+
+```sql
+CREATE DATABASE wordpress;
+CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPass@123';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+Test:
+
+```bash
+mysql -u wpuser -p wordpress
+```
+
+---
+
+## STEP 11: Install PHP & PHP-FPM
+
+```bash
+dnf module reset php -y
+dnf module enable php:8.0 -y
+dnf install -y php php-fpm php-mysqlnd php-gd php-xml php-mbstring php-curl php-json
+systemctl enable --now php-fpm
+systemctl status php-fpm
+```
+
+---
+
+## STEP 12: Configure PHP-FPM to Run as NGINX
+
+```bash
+nano /etc/php-fpm.d/www.conf
+```
+
+Modify:
+
+```ini
+user = nginx
+group = nginx
+```
+
+Restart PHP-FPM:
+
+```bash
+systemctl restart php-fpm
+```
+
+---
+
+## STEP 13: Prepare WordPress Web Directory
+
+```bash
+mkdir -p /var/www/wordpress
+chown -R nginx:nginx /var/www
+chmod -R 755 /var/www
+```
+
+---
+
+## STEP 14: Configure NGINX for WordPress
+
+```bash
+nano /etc/nginx/nginx.conf
+```
+
+Replace ONLY the `server {}` block with:
+
+```nginx
+server {
+    listen 80 default_server;
+    server_name _;
+
+    root /var/www/wordpress;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php-fpm/www.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+}
+```
+
+Test & restart:
+
+```bash
+nginx -t
+systemctl restart nginx
+```
+
+---
+
+## STEP 15: Download WordPress
+
+```bash
+cd /tmp
+curl -O https://wordpress.org/latest.tar.gz
+tar -xzf latest.tar.gz
+```
+
+---
+
+## STEP 16: Deploy WordPress Files
+
+```bash
+cp -r /tmp/wordpress/* /var/www/wordpress/
+chown -R nginx:nginx /var/www/wordpress
+```
+
+---
+
+## STEP 17: Configure WordPress
+
+```bash
+cd /var/www/wordpress
+cp wp-config-sample.php wp-config.php
+nano wp-config.php
+```
+
+Set:
+
+```php
+define('DB_NAME', 'wordpress');
+define('DB_USER', 'wpuser');
+define('DB_PASSWORD', 'StrongPass@123');
+define('DB_HOST', 'localhost');
+```
+
+---
+
+## STEP 18: Remove Default Page & Restart Services
+
+```bash
+rm -f /usr/share/nginx/html/index.html
+systemctl restart nginx
+systemctl restart php-fpm
+systemctl restart mariadb
+```
+
+---
+
+## ✅ FINAL TEST
+
+Open in browser:
+
+```
+http://SERVER_IP
+```
+
+You should see the **WordPress installation screen**.
+
+---
+
+## ⚠️ Important Notes
+
+* SELinux is disabled in this setup
+* NGINX main config is modified directly
+* Suitable for practice and machine tests only
+
+---
+
+## ✅ Result
+
+If WordPress loads successfully, the installation is complete.
