@@ -6,6 +6,13 @@ Root or sudo user
 
 Fresh system (LEMP removed already)
 
+ if firewall neeed to be allowed
+
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+
+
 ✅ STEP 1: Update system
 sudo dnf update -y
 (sudo dnf install epel-release)
