@@ -8,6 +8,8 @@ Fresh system (LEMP removed already)
 
 ✅ STEP 1: Update system
 sudo dnf update -y
+(sudo dnf install epel-release)
+sudo dnf install nano
 
 ✅ STEP 2: Install NGINX
 sudo dnf install -y nginx
